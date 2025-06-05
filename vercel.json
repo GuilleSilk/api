@@ -1,5 +1,5 @@
 {
-  "buildCommand": false,
+  "buildCommand": null,
   "functions": {
     "api/validate-license.js": {
       "maxDuration": 10
