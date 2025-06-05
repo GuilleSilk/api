@@ -1,10 +1,11 @@
-// API endpoint para Vercel - USANDO JSON COMPLETO
+// API endpoint para Vercel - CON CORS CONFIGURADO
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
 
-// Configuración de Google Sheets usando JSON completo
+// Configuración de Google Sheets
 const SHEET_ID = process.env.GOOGLE_SHEET_ID
-const GOOGLE_CREDENTIALS = process.env.GOOGLE_CREDENTIALS
+const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n")
 
 // Función para añadir headers CORS
 function addCorsHeaders(res) {
@@ -38,11 +39,10 @@ export default async function handler(req, res) {
       })
     }
 
-    // Configurar autenticación con Google Sheets usando JSON completo
-    const credentials = JSON.parse(GOOGLE_CREDENTIALS)
+    // Configurar autenticación con Google Sheets
     const serviceAccountAuth = new JWT({
-      email: credentials.client_email,
-      key: credentials.private_key,
+      email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: GOOGLE_PRIVATE_KEY,
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     })
 
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     // Obtener todas las filas
     const rows = await sheet.getRows()
 
-    // Buscar la licencia
+    // Buscar la licencia - SÚPER SIMPLE
     const licenseRow = rows.find((row) => row.get("licencia") === licencia)
 
     if (!licenseRow) {
