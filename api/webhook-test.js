@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     total_price: "89.97",
     currency: "EUR",
     customer: {
-      email: "test@example.com",
+      email: "elliugpaso@gmail.com",
       first_name: "Juan",
       last_name: "Pérez",
     },
