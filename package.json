@@ -4,6 +4,7 @@
   "description": "Sistema de licencias para Silkify Theme",
   "type": "module",
   "scripts": {
+    "build": "echo 'No build step needed'",
     "dev": "vercel dev"
   },
   "dependencies": {
