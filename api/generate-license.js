@@ -1,4 +1,4 @@
-// API para generar licencias automáticamente - ENFOQUE SIMPLE Y LIMPIO
+// API para generar licencias automáticamente - CON CORS
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
 import { Resend } from "resend"
@@ -12,6 +12,14 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.FROM_EMAIL || "licencias@tudominio.com"
 
 const resend = new Resend(RESEND_API_KEY)
+
+// Función para añadir headers CORS
+function addCorsHeaders(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*")
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+  res.setHeader("Access-Control-Max-Age", "86400")
+}
 
 // Función para generar licencia aleatoria
 function generateLicenseKey() {
@@ -149,6 +157,14 @@ async function sendMultipleLicensesEmail(licenseData) {
 }
 
 export default async function handler(req, res) {
+  // Añadir headers CORS a todas las respuestas
+  addCorsHeaders(res)
+
+  // Manejar preflight request (OPTIONS)
+  if (req.method === "OPTIONS") {
+    return res.status(200).end()
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" })
   }
