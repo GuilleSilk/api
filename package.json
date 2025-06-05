@@ -1,0 +1,8 @@
+{
+  "name": "sistema-licencias-shopify",
+  "version": "1.0.0",
+  "dependencies": {
+    "google-spreadsheet": "^4.1.2",
+    "google-auth-library": "^9.4.1"
+  }
+}
