@@ -6,5 +6,7 @@
     "api/generate-license.js": {
       "maxDuration": 10
     }
-  }
+  },
+  "buildCommand": null,
+  "installCommand": "npm install"
 }
