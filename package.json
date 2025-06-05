@@ -4,6 +4,7 @@
   "description": "Sistema de licencias para Silkify Theme",
   "main": "index.js",
   "scripts": {
+    "build": "echo 'No build needed for serverless functions'",
     "dev": "vercel dev"
   },
   "dependencies": {
