@@ -1,4 +1,4 @@
-// API endpoint para Vercel
+// API endpoint para Vercel - SÚPER SIMPLE
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
 
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     // Obtener todas las filas
     const rows = await sheet.getRows()
 
-    // Buscar la licencia
+    // Buscar la licencia - SÚPER SIMPLE
     const licenseRow = rows.find((row) => row.get("licencia") === licencia)
 
     if (!licenseRow) {
@@ -55,8 +55,8 @@ export default async function handler(req, res) {
       })
     }
 
-    const currentHashTienda = licenseRow.get("hash_tienda")
     const currentStatus = licenseRow.get("status")
+    const currentHashTienda = licenseRow.get("hash_tienda")
 
     // Si la licencia ya está inválida
     if (currentStatus === "inválida") {
