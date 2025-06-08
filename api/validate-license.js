@@ -9,7 +9,7 @@ const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n")
 
 // Función para añadir headers CORS
-function addCorsHeaders(res: { setHeader: (h: string, v: string) => void }) {
+function addCorsHeaders(res) {
   res.setHeader("Access-Control-Allow-Origin", "*")
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
