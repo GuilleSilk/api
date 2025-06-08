@@ -7,7 +7,8 @@ const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_PRIVATE_KEY           = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
 // CORS
-function addCorsHeaders(res) {
+type Headers = { [key: string]: string };
+function addCorsHeaders(res: { setHeader(header: string, value: string): void }) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -16,7 +17,6 @@ function addCorsHeaders(res) {
 
 export default async function handler(req, res) {
   addCorsHeaders(res);
-
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -42,6 +42,7 @@ export default async function handler(req, res) {
     const sheet = doc.sheetsByTitle["Licencias"];
     if (!sheet) throw new Error("Hoja 'Licencias' no encontrada");
 
+    // Leer filas
     const rows = await sheet.getRows();
     const row  = rows.find(r => r.licencia === licencia);
 
@@ -50,22 +51,21 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, cleared: false });
     }
 
-    // Limpiar hash_tienda, reactivar y contar usos
+    // Limpiar hash_tienda, mantener activa y contar usos
     row.hash_tienda         = "";
     row.status              = "activa";
     row.ultima_verificacion = new Date().toISOString().split("T")[0];
 
     // Incrementar contador de número de tiendas
-    // Asumimos que en la hoja hay una columna "numero_de_tiendas"
     const prevCount = parseInt(row.numero_de_tiendas || "0", 10);
-    row.numero_de_tiendas = (prevCount + 1).toString();
+    row.numero_de_tiendas   = (prevCount + 1).toString();
 
     await row.save();
 
     return res.status(200).json({ success: true, cleared: true });
   } catch (e) {
     console.error("Error clearing license:", e);
-    // Respondemos 200 para no romper cliente
+    // Devolvemos 200 para no romper al cliente
     return res.status(200).json({ success: false, error: "Error interno" });
   }
 }
