@@ -67,7 +67,7 @@ export default async function handler(req, res) {
     // Acción: clear libera la licencia
     if (action === 'clear') {
       licenseRow.set("hash_tienda", "")
-      licenseRow.set("status", "activa")
+      licenseRow.set("status", "inactiva")
       licenseRow.set("última_verificación", today)
       await licenseRow.save()
       return res.json({ valid: true, message: "Licencia liberada" })
