@@ -1,3 +1,5 @@
+// File: pages/api/clear-license.js
+
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
 
@@ -6,7 +8,7 @@ const SHEET_ID                     = process.env.GOOGLE_SHEET_ID;
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_PRIVATE_KEY           = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
-// CORS
+// Función para añadir headers CORS
 function addCorsHeaders(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -17,9 +19,12 @@ function addCorsHeaders(res) {
 export default async function handler(req, res) {
   addCorsHeaders(res);
 
+  // Preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
+
+  // Solo POST
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
@@ -30,7 +35,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: false, error: "Falta parámetro licencia" });
     }
 
-    // Autenticación Google Sheets
+    // Autenticación en Google Sheets
     const auth = new JWT({
       email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: GOOGLE_PRIVATE_KEY,
@@ -39,33 +44,34 @@ export default async function handler(req, res) {
     const doc = new GoogleSpreadsheet(SHEET_ID, auth);
     await doc.loadInfo();
 
+    // Acceder a la hoja con título exacto "Licencias"
     const sheet = doc.sheetsByTitle["Licencias"];
     if (!sheet) throw new Error("Hoja 'Licencias' no encontrada");
 
-    // Leer filas
     const rows = await sheet.getRows();
     const row  = rows.find(r => r.licencia === licencia);
 
     if (!row) {
-      // No existe → nothing to clear
+      // No existe, nothing to do
       return res.status(200).json({ success: true, cleared: false });
     }
 
-    // Limpiar hash_tienda, mantener activa y contar usos
+    // Limpiar hash, mantener activa
     row.hash_tienda         = "";
     row.status              = "activa";
     row.ultima_verificacion = new Date().toISOString().split("T")[0];
 
-    // Incrementar contador de número de tiendas
-    const prevCount = parseInt(row.numero_de_tiendas || "0", 10);
-    row.numero_de_tiendas   = (prevCount + 1).toString();
+    // Incrementar contador de tiendas
+    const prev = parseInt(row.numero_de_tiendas || "0", 10);
+    row.numero_de_tiendas   = (prev + 1).toString();
 
+    // Persistir cambios
     await row.save();
 
     return res.status(200).json({ success: true, cleared: true });
-  } catch (e) {
-    console.error("Error clearing license:", e);
-    // Devolvemos 200 para no romper al cliente
+  } catch (error) {
+    console.error("Error clearing license:", error);
+    // Siempre 200 para no romper el cliente
     return res.status(200).json({ success: false, error: "Error interno" });
   }
 }
