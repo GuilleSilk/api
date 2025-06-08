@@ -1,11 +1,3 @@
-export default async function handler(req, res) {
-  // ► Simulación de error interno:
-  return res.status(500).json({ valid: false, error: "Error simulado 500" });
-
-  // … resto de tu código …
-
-
-
 // API endpoint para Vercel - CON CORS CONFIGURADO
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
@@ -121,4 +113,4 @@ export default async function handler(req, res) {
     })
   }
 }
-}
+
