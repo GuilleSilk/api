@@ -7,8 +7,7 @@ const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_PRIVATE_KEY           = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
 // CORS
-type Headers = { [key: string]: string };
-function addCorsHeaders(res: { setHeader(header: string, value: string): void }) {
+function addCorsHeaders(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -17,6 +16,7 @@ function addCorsHeaders(res: { setHeader(header: string, value: string): void })
 
 export default async function handler(req, res) {
   addCorsHeaders(res);
+
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
