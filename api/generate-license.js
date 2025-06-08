@@ -239,7 +239,7 @@ export default async function handler(req, res) {
         licencia: generatedLicenses[i],
         hash_tienda: "", // Inicialmente vacío
         license_number: `${i + 1}/${totalLicenses}`,
-        status: "activa",
+        status: "nueva",
         última_verificación: today,
         fecha_creacion: today,
         order_total: req.body.total_price || "",
