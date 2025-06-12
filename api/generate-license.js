@@ -75,37 +75,136 @@ async function sendMultipleLicensesEmail(licenseData) {
       .join("")
 
     const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #f8f9fa; padding: 20px; text-align: center; border-radius: 8px; }
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silkify - Licencias</title>
+    <!-- Fuentes: Roboto para cuerpo, Poppins para encabezado -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Poppins:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            background-color: #f4f6f8;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        .wrapper {
+            width: 100%;
+            padding: 20px 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            background-color: #ffffff;
+            display: flex;
+            align-items: center;
+            padding: 30px;
+        }
+        .header img {
+            max-width: 100px;
+            margin-right: 15px;
+        }
+        .header h1 {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: #000;
+        }
+        .greeting {
+            padding: 0 30px 30px;
+        }
+        .greeting h2 {
+            font-size: 20px;
+            margin: 0 0 10px;
+            text-align: center;
+        }
+        .greeting p {
+            margin: 0;
+            font-size: 16px;
+            text-align: center;
+        }
+        .summary {
+            padding: 20px;
+            background-color: #ffffff;
+            border-bottom: 1px solid #e1e7f3;
+        }
+        .summary p {
+            margin: 8px 0;
+            font-size: 15px;
+        }
+        .licenses {
+            padding: 20px;
+            background-color: #ffffff;
+        }
             .license-box { background: #e3f2fd; padding: 20px; margin: 15px 0; border-radius: 8px; text-align: center; }
             .license-code { font-size: 20px; font-weight: bold; color: #1976d2; letter-spacing: 2px; margin: 10px 0; }
-            .instructions { background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; }
-            .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-            .summary { background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0; }
-        </style>
-    </head>
-    <body>
+        .instructions {
+            padding: 20px;
+            background-color: #ffffff;
+            border-top: 1px solid #e1e7f3;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+        .instructions ol, .instructions ul {
+            margin: 10px 0 10px 20px;
+        }
+        .instructions li {
+            margin: 6px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 15px 20px;
+            font-size: 13px;
+            color: #888;
+        }
+        .footer a {
+            color: #1976d2;
+            text-decoration: none;
+        }
+        .legal {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            padding: 10px 20px;
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
         <div class="container">
             <div class="header">
-                <h1>¡Tus ${licenses.length} licencias de Silkify están listas! 🎉</h1>
-                <p>Gracias por tu compra, ${customerName || "Cliente"}</p>
+                <img src="https://cdn.shopify.com/s/files/1/0915/1784/5839/files/ChatGPT_Image_14_may_2025_14_02_34sinfondo.png?v=1747224314" alt="Logo Silkify">
+                <h1>Silkify</h1>
             </div>
-            
+
+            <div class="greeting">
+                <h2>¡Tus ${licenses.length} licencias de Silkify están listas!</h2>
+                <p>Gracias por tu compra, ${customerName || 'Cliente'}</p>
+            </div>
+
             <div class="summary">
                 <p><strong>Pedido:</strong> #${orderNumber}</p>
                 <p><strong>Licencias incluidas:</strong> ${licenses.length}</p>
-                <p><strong>Total:</strong> ${orderTotal} ${currency}</p>
             </div>
-            
-            <h2>📋 Tus códigos de licencia:</h2>
-            ${licensesHtml}
-            
+
+            <div class="licenses">
+                <h2>📋 Tus códigos de licencia:</h2>
+                ${licensesHtml}
+            </div>
+
             <div class="instructions">
                 <h3>📋 Instrucciones de activación:</h3>
                 <ol>
@@ -115,7 +214,6 @@ async function sendMultipleLicensesEmail(licenseData) {
                     <li>Guarda los cambios</li>
                     <li>¡Tu tema ya está activado! ✅</li>
                 </ol>
-                
                 <p><strong>💡 Importante:</strong></p>
                 <ul>
                     <li>Cada licencia es para <strong>una tienda diferente</strong></li>
@@ -124,16 +222,21 @@ async function sendMultipleLicensesEmail(licenseData) {
                     <li>Cada licencia solo puede estar activa en una tienda a la vez</li>
                 </ul>
             </div>
-            
-            <p>Si tienes algún problema con la activación, no dudes en contactarnos respondiendo a este email.</p>
-            
+
             <div class="footer">
+                <p>Este es un correo automático.Si tienes alguna duda, por favor ponte en contacto a través de nuestra web.</p>
                 <p>Gracias por elegir Silkify<br>
-                <a href="https://www.silkifystore.com">www.silkifystore.com</a></p>
+                <a href="https://www.silkifytheme.com">www.silkifytheme.com</a></p>
+            </div>
+
+            <div class="legal">
+                <p>© 2025 Silkify. Todos los derechos reservados.</p>
             </div>
         </div>
-    </body>
-    </html>
+    </div>
+</body>
+</html>
+
     `
 
     const { data, error } = await resend.emails.send({
