@@ -136,7 +136,6 @@ async function sendMultipleLicensesEmail(licenseData) {
         .summary {
             padding: 20px;
             background-color: #ffffff;
-            border-bottom: 1px solid #e1e7f3;
         }
         .summary p {
             margin: 8px 0;
@@ -144,14 +143,33 @@ async function sendMultipleLicensesEmail(licenseData) {
         }
         .licenses {
             padding: 20px;
-            background-color: #ffffff;
+            background-color: rgba(227, 242, 253, 0.4);
+            border-radius: 8px;
+            margin: 20px;
+             box-shadow:inset 0 4px 6px rgba(0, 0, 0, 0.1),                                         0 4px 10px rgba(0, 0, 0, 0.06);  
         }
-            .license-box { background: #e3f2fd; padding: 20px; margin: 15px 0; border-radius: 8px; text-align: center; }
-            .license-code { font-size: 20px; font-weight: bold; color: #1976d2; letter-spacing: 2px; margin: 10px 0; }
+        .licenses h2 {
+            margin-top: 0;
+        }
+        .license-box {
+            max-width: 80%;
+            margin: 15px auto;
+            padding: 15px;
+            background-color: rgba(227, 242, 253, 0.8);
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        .license-code {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0d47a1;
+            letter-spacing: 2px;
+            margin: 0;
+        }
         .instructions {
             padding: 20px;
             background-color: #ffffff;
-            border-top: 1px solid #e1e7f3;
         }
         .instructions h3 {
             margin-top: 0;
@@ -224,7 +242,7 @@ async function sendMultipleLicensesEmail(licenseData) {
             </div>
 
             <div class="footer">
-                <p>Este es un correo automático.Si tienes alguna duda, por favor ponte en contacto a través de nuestra web.</p>
+                <p>Este es un correo automático. Si tienes alguna duda, por favor ponte en contacto a través de nuestra web.</p>
                 <p>Gracias por elegir Silkify<br>
                 <a href="https://www.silkifytheme.com">www.silkifytheme.com</a></p>
             </div>
@@ -236,6 +254,8 @@ async function sendMultipleLicensesEmail(licenseData) {
     </div>
 </body>
 </html>
+
+
 
     `
 
