@@ -51,7 +51,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ valid: false, error: "Hoja de licencias no encontrada" })
     }
 
-    // Obtener todas las filas\    
+    // Obtener todas las filas
     const rows = await sheet.getRows()
 
     // Buscar la licencia - SÚPER SIMPLE
@@ -86,13 +86,13 @@ export default async function handler(req, res) {
       return res.json({ valid: false, error: "Licencia inválida" })
     }
 
-    // Si ya hay un hash y es diferente al actual
+    // Si ya hay un hash y es diferente al actual (licencia en uso)
     if (currentHashTienda && currentHashTienda !== hash_tienda) {
-      // Invalidar la licencia
+      // Invalidar la licencia y devolver mensaje con HTML para showError
       licenseRow.set("status", "inválida")
       licenseRow.set("última_verificación", today)
       await licenseRow.save()
-      return res.json({ valid: false, error: "Licencia ya está en uso en otra tienda" })
+      return res.json({ valid: false, error: "Esta licencia ya está en uso por otra tienda.<br>Adquiere una nueva en <a href=\"https://www.silkifytheme.com\" target=\"_blank\">silkifytheme.com</a>." })
     }
 
     // Actualizar la licencia con el hash actual
