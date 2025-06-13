@@ -92,7 +92,7 @@ export default async function handler(req, res) {
       licenseRow.set("status", "inválida")
       licenseRow.set("última_verificación", today)
       await licenseRow.save()
-      return res.json({ valid: false, error: "Esta licencia ya está en uso por otra tienda.<br>Adquiere una nueva en <a href=\"https://www.silkifytheme.com\" target=\"_blank\">silkifytheme.com</a>." })
+      return res.json({ valid: false, error: "duplicada" })
     }
 
     // Actualizar la licencia con el hash actual
