@@ -92,7 +92,9 @@ export default async function handler(req, res) {
       licenseRow.set("status", "inválida")
       licenseRow.set("última_verificación", today)
       await licenseRow.save()
-      return res.json({ valid: false, error: "duplicada" })
+      return res
+        .status(409)
+        .json({ valid: false, error: "duplicada" })
     }
 
     // Actualizar la licencia con el hash actual
