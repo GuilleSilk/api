@@ -1,8 +1,9 @@
-// API para generar licencias automáticamente - CON CORS
+// API para generar licencias automáticamente - CON CORS y verificación de webhook
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
 import { Resend } from "resend"
 import crypto from "crypto"
+import { type NextRequest, NextResponse } from "next/server"
 
 // Variables de entorno
 const SHEET_ID = process.env.GOOGLE_SHEET_ID
@@ -10,15 +11,22 @@ const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n")
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.FROM_EMAIL || "licencias@tudominio.com"
+const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET
 
 const resend = new Resend(RESEND_API_KEY)
 
-// Función para añadir headers CORS
-function addCorsHeaders(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*")
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
-  res.setHeader("Access-Control-Max-Age", "86400")
+// Función para verificar la autenticidad del webhook de Shopify
+function verifyShopifyWebhook(body: string, signature: string): boolean {
+  if (!SHOPIFY_WEBHOOK_SECRET) {
+    console.warn("SHOPIFY_WEBHOOK_SECRET no configurado - saltando verificación")
+    return true
+  }
+
+  const hmac = crypto.createHmac("sha256", SHOPIFY_WEBHOOK_SECRET)
+  hmac.update(body, "utf8")
+  const calculatedSignature = hmac.digest("base64")
+
+  return crypto.timingSafeEqual(Buffer.from(signature, "base64"), Buffer.from(calculatedSignature, "base64"))
 }
 
 // Función para generar licencia aleatoria
@@ -30,13 +38,13 @@ function generateLicenseKey() {
 }
 
 // Función para generar licencias únicas
-async function generateUniqueLicenses(count, sheet) {
+async function generateUniqueLicenses(count: number, sheet: any) {
   const licenses = []
   const existingLicenses = new Set()
 
   // Obtener todas las licencias existentes
   const rows = await sheet.getRows()
-  rows.forEach((row) => {
+  rows.forEach((row: any) => {
     const license = row.get("licencia")
     if (license) {
       existingLicenses.add(license)
@@ -58,14 +66,14 @@ async function generateUniqueLicenses(count, sheet) {
 }
 
 // Función para enviar email con múltiples licencias
-async function sendMultipleLicensesEmail(licenseData) {
+async function sendMultipleLicensesEmail(licenseData: any) {
   try {
     const { licenses, customerEmail, customerName, orderNumber, orderTotal, currency } = licenseData
 
     // Generar HTML para múltiples licencias
     const licensesHtml = licenses
       .map(
-        (license, index) => `
+        (license: string, index: number) => `
       <div class="license-box">
         <h3>Licencia ${index + 1}:</h3>
         <div class="license-code">${license}</div>
@@ -81,7 +89,6 @@ async function sendMultipleLicensesEmail(licenseData) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Silkify - Licencias</title>
-    <!-- Fuentes: Roboto para cuerpo, Poppins para encabezado -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Poppins:wght@700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -146,7 +153,7 @@ async function sendMultipleLicensesEmail(licenseData) {
             background-color: rgba(227, 242, 253, 0.4);
             border-radius: 8px;
             margin: 20px;
-             box-shadow:inset 0 4px 6px rgba(0, 0, 0, 0.1),                                         0 4px 10px rgba(0, 0, 0, 0.06);  
+            box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.06);
         }
         .licenses h2 {
             margin-top: 0;
@@ -210,7 +217,7 @@ async function sendMultipleLicensesEmail(licenseData) {
 
             <div class="greeting">
                 <h2>¡Tus ${licenses.length} licencias de Silkify están listas!</h2>
-                <p>Gracias por tu compra, ${customerName || 'Cliente'}</p>
+                <p>Gracias por tu compra, ${customerName || "Cliente"}</p>
             </div>
 
             <div class="summary">
@@ -254,9 +261,6 @@ async function sendMultipleLicensesEmail(licenseData) {
     </div>
 </body>
 </html>
-
-
-
     `
 
     const { data, error } = await resend.emails.send({
@@ -279,22 +283,21 @@ async function sendMultipleLicensesEmail(licenseData) {
   }
 }
 
-export default async function handler(req, res) {
-  // Añadir headers CORS a todas las respuestas
-  addCorsHeaders(res)
-
-  // Manejar preflight request (OPTIONS)
-  if (req.method === "OPTIONS") {
-    return res.status(200).end()
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" })
-  }
-
+export async function POST(request: NextRequest) {
   try {
-    // Datos del webhook de Shopify
-    const { id: order_id, order_number, customer, line_items, billing_address, shipping_address } = req.body
+    // Obtener el cuerpo del request como texto para verificar la firma
+    const body = await request.text()
+    const signature = request.headers.get("X-Shopify-Hmac-Sha256")
+
+    // Verificar la autenticidad del webhook
+    if (signature && !verifyShopifyWebhook(body, signature)) {
+      console.error("Webhook signature verification failed")
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Parsear el JSON después de la verificación
+    const orderData = JSON.parse(body)
+    const { id: order_id, order_number, customer, line_items, billing_address, shipping_address } = orderData
 
     console.log(`Procesando pedido: ${order_number} para ${customer?.email}`)
 
@@ -302,7 +305,7 @@ export default async function handler(req, res) {
     let totalLicenses = 0
     const themeItems = []
 
-    line_items?.forEach((item) => {
+    line_items?.forEach((item: any) => {
       // DETECCIÓN ESPECÍFICA: Solo SKU "SilkifyTheme" o título "Silkify Theme"
       const isSilkifyTheme = item.sku === "SilkifyTheme" || item.title?.includes("Silkify Theme")
 
@@ -329,7 +332,7 @@ export default async function handler(req, res) {
 
     if (totalLicenses === 0) {
       console.log("Pedido no incluye productos Silkify Theme, ignorando")
-      return res.json({ success: true, message: "No es compra de Silkify Theme" })
+      return NextResponse.json({ success: true, message: "No es compra de Silkify Theme" })
     }
 
     console.log(`Generando ${totalLicenses} licencias para el pedido ${order_number}`)
@@ -353,7 +356,7 @@ export default async function handler(req, res) {
     const generatedLicenses = await generateUniqueLicenses(totalLicenses, sheet)
     const today = new Date().toISOString().split("T")[0]
 
-    // Crear UNA FILA POR LICENCIA (como quieres)
+    // Crear UNA FILA POR LICENCIA
     for (let i = 0; i < totalLicenses; i++) {
       await sheet.addRow({
         order_number: order_number || order_id,
@@ -365,8 +368,8 @@ export default async function handler(req, res) {
         status: "nueva",
         última_verificación: today,
         fecha_creacion: today,
-        order_total: req.body.total_price || "",
-        currency: req.body.currency || "EUR",
+        order_total: orderData.total_price || "",
+        currency: orderData.currency || "EUR",
       })
     }
 
@@ -379,8 +382,8 @@ export default async function handler(req, res) {
         customerEmail: customer.email,
         customerName: `${customer.first_name || ""} ${customer.last_name || ""}`.trim(),
         orderNumber: order_number || order_id,
-        orderTotal: req.body.total_price || "0",
-        currency: req.body.currency || "EUR",
+        orderTotal: orderData.total_price || "0",
+        currency: orderData.currency || "EUR",
       })
 
       if (emailResult.success) {
@@ -390,7 +393,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.json({
+    return NextResponse.json({
       success: true,
       licenses: generatedLicenses,
       total_licenses: totalLicenses,
@@ -399,10 +402,13 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error("Error generating licenses:", error)
-    return res.status(500).json({
-      success: false,
-      error: "Error generando licencias",
-      details: error.message,
-    })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Error generando licencias",
+        details: error.message,
+      },
+      { status: 500 },
+    )
   }
 }
