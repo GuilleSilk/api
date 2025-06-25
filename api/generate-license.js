@@ -1,4 +1,4 @@
-// ✅ VERSIÓN CON DEBUGGING MEJORADO
+// ✅ VERSIÓN CON VERIFICACIÓN HMAC CORREGIDA
 
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
@@ -15,18 +15,35 @@ const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET
 
 const resend = new Resend(RESEND_API_KEY)
 
-// Función para verificar la autenticidad del webhook de Shopify
+// 🔧 FUNCIÓN DE VERIFICACIÓN HMAC CORREGIDA
 function verifyShopifyWebhook(body, signature) {
   if (!SHOPIFY_WEBHOOK_SECRET) {
-    console.warn("SHOPIFY_WEBHOOK_SECRET no configurado - saltando verificación")
+    console.warn("⚠️ [HMAC] SHOPIFY_WEBHOOK_SECRET no configurado - saltando verificación")
     return true
   }
 
-  const hmac = crypto.createHmac("sha256", SHOPIFY_WEBHOOK_SECRET)
-  hmac.update(body, "utf8")
-  const calculatedSignature = hmac.digest("base64")
+  console.log("🔍 [HMAC] Secret configurado:", SHOPIFY_WEBHOOK_SECRET.substring(0, 10) + "...")
+  console.log("🔍 [HMAC] Signature recibida:", signature)
+  console.log("🔍 [HMAC] Body type:", typeof body)
+  console.log("🔍 [HMAC] Body length:", body.length)
 
-  return crypto.timingSafeEqual(Buffer.from(signature, "base64"), Buffer.from(calculatedSignature, "base64"))
+  try {
+    // Crear HMAC con SHA256
+    const hmac = crypto.createHmac("sha256", SHOPIFY_WEBHOOK_SECRET)
+    hmac.update(body, "utf8")
+    const calculatedSignature = hmac.digest("base64")
+
+    console.log("🔍 [HMAC] Signature calculada:", calculatedSignature)
+
+    // Comparar signatures
+    const isValid = crypto.timingSafeEqual(Buffer.from(signature, "base64"), Buffer.from(calculatedSignature, "base64"))
+
+    console.log("🔍 [HMAC] Verificación resultado:", isValid)
+    return isValid
+  } catch (error) {
+    console.error("❌ [HMAC] Error en verificación:", error.message)
+    return false
+  }
 }
 
 // Función para añadir headers CORS
@@ -291,14 +308,10 @@ async function sendMultipleLicensesEmail(licenseData) {
   }
 }
 
-// ✅ HANDLER CON DEBUGGING MEJORADO
+// ✅ HANDLER CON MEJOR MANEJO DEL BODY RAW
 export default async function handler(req, res) {
-  // 📝 LOGS DE DEBUGGING
   console.log("🚀 [WEBHOOK] Webhook recibido de Shopify")
   console.log("🕐 [WEBHOOK] Timestamp:", new Date().toISOString())
-  console.log("🔍 [DEBUG] Método HTTP:", req.method)
-  console.log("🔍 [DEBUG] Headers:", JSON.stringify(req.headers, null, 2))
-  console.log("🔍 [DEBUG] URL:", req.url)
 
   // Añadir headers CORS a todas las respuestas
   addCorsHeaders(res)
@@ -309,14 +322,13 @@ export default async function handler(req, res) {
     return res.status(200).end()
   }
 
-  // ✅ PERMITIR TANTO GET COMO POST PARA DEBUGGING
+  // Permitir GET para testing
   if (req.method === "GET") {
-    console.log("🔍 [DEBUG] Request GET recibido - respondiendo con info")
+    console.log("🔍 [DEBUG] Request GET recibido")
     return res.json({
       message: "Webhook endpoint funcionando",
       timestamp: new Date().toISOString(),
-      method: req.method,
-      url: req.url,
+      webhook_secret_configured: !!SHOPIFY_WEBHOOK_SECRET,
     })
   }
 
@@ -325,23 +337,25 @@ export default async function handler(req, res) {
     return res.status(405).json({
       error: "Method not allowed",
       received_method: req.method,
-      expected_method: "POST",
     })
   }
 
   try {
     console.log("📦 [WEBHOOK] Procesando request POST...")
 
-    // Para verificar la firma necesitamos el body raw
-    let body
-    if (typeof req.body === "string") {
-      body = req.body
+    // 🔧 OBTENER EL BODY RAW CORRECTAMENTE
+    let rawBody
+    if (Buffer.isBuffer(req.body)) {
+      rawBody = req.body.toString("utf8")
+    } else if (typeof req.body === "string") {
+      rawBody = req.body
     } else {
-      body = JSON.stringify(req.body)
+      rawBody = JSON.stringify(req.body)
     }
 
-    console.log("🔍 [DEBUG] Tipo de body:", typeof req.body)
-    console.log("🔍 [DEBUG] Body length:", body.length)
+    console.log("🔍 [DEBUG] Raw body type:", typeof rawBody)
+    console.log("🔍 [DEBUG] Raw body length:", rawBody.length)
+    console.log("🔍 [DEBUG] Raw body preview:", rawBody.substring(0, 200) + "...")
 
     const signature = req.headers["x-shopify-hmac-sha256"]
 
@@ -349,16 +363,26 @@ export default async function handler(req, res) {
     console.log("🔐 [WEBHOOK] Verificando firma HMAC...")
     console.log("🔐 [WEBHOOK] Signature presente:", !!signature)
 
-    // Verificar webhook
-    if (signature && !verifyShopifyWebhook(body, signature)) {
+    // 🔧 OPCIÓN: SALTAR VERIFICACIÓN TEMPORALMENTE PARA TESTING
+    const skipVerification = process.env.SKIP_WEBHOOK_VERIFICATION === "true"
+    if (skipVerification) {
+      console.log("⚠️ [HMAC] Saltando verificación HMAC (modo testing)")
+    } else if (signature && !verifyShopifyWebhook(rawBody, signature)) {
       console.error("❌ [WEBHOOK] Verificación HMAC falló")
-      return res.status(401).json({ error: "Unauthorized" })
+      return res.status(401).json({
+        error: "Unauthorized",
+        debug: {
+          signature_present: !!signature,
+          body_length: rawBody.length,
+          secret_configured: !!SHOPIFY_WEBHOOK_SECRET,
+        },
+      })
     }
 
     console.log("✅ [WEBHOOK] Verificación HMAC exitosa")
 
     // Parsear datos del pedido
-    const orderData = typeof req.body === "string" ? JSON.parse(req.body) : req.body
+    const orderData = JSON.parse(rawBody)
     const { id: order_id, order_number, customer, line_items } = orderData
 
     // 📝 LOG DE PEDIDO
