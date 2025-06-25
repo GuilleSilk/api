@@ -219,6 +219,18 @@ async function sendMultipleLicensesEmail(licenseData) {
             padding: 10px 20px;
             background-color: #ffffff;
         }
+        .important-note {
+    background-color: #ffebee;          /* fondo rojo muy suave */
+    border-left: 6px solid #f44336;     /* borde rojo intenso */
+    padding: 15px 20px;                 /* espacio interior */
+    border-radius: 6px;                 /* esquinas redondeadas */
+    margin: 20px 0;                     /* separa del resto */
+    font-size: 15px;                    /* tamaño legible */
+    line-height: 1.5;                   /* buena lectura */
+}
+.important-note p {
+    margin: 0;
+}
     </style>
 </head>
 <body>
@@ -260,7 +272,18 @@ async function sendMultipleLicensesEmail(licenseData) {
                     <li>Guarda las licencias restantes para futuras tiendas</li>
                     <li>Cada licencia solo puede estar activa en una tienda a la vez</li>
                 </ul>
+
+    <div class="important-note">
+        🚨❗️ <strong>IMPORTANTE:</strong><br>
+        Si vas a activar esta licencia en otra tienda, primero <strong>elimina</strong> la licencia de la tienda actual y <strong>guarda los cambios</strong>.  
+        De lo contrario, el sistema detectará un uso simultáneo en dos tiendas y la licencia quedará <strong>inválida</strong>.  
+        En ese caso perderás la licencia y será necesario adquirir una nueva.
+    </div>
+                
+                
             </div>
+
+
 
             <div class="footer">
                 <p>Este es un correo automático. Si tienes alguna duda, por favor ponte en contacto a través de nuestra web.</p>
