@@ -1,9 +1,7 @@
-// API para generar licencias automáticamente - CON CORS y verificación de webhook
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
 import { Resend } from "resend"
 import crypto from "crypto"
-import { type NextRequest, NextResponse } from "next/server"
 
 // Variables de entorno
 const SHEET_ID = process.env.GOOGLE_SHEET_ID
@@ -16,7 +14,7 @@ const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET
 const resend = new Resend(RESEND_API_KEY)
 
 // Función para verificar la autenticidad del webhook de Shopify
-function verifyShopifyWebhook(body: string, signature: string): boolean {
+function verifyShopifyWebhook(body, signature) {
   if (!SHOPIFY_WEBHOOK_SECRET) {
     console.warn("SHOPIFY_WEBHOOK_SECRET no configurado - saltando verificación")
     return true
@@ -29,6 +27,14 @@ function verifyShopifyWebhook(body: string, signature: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(signature, "base64"), Buffer.from(calculatedSignature, "base64"))
 }
 
+// Función para añadir headers CORS
+function addCorsHeaders(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*")
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Shopify-Hmac-Sha256")
+  res.setHeader("Access-Control-Max-Age", "86400")
+}
+
 // Función para generar licencia aleatoria
 function generateLicenseKey() {
   const part1 = crypto.randomBytes(2).toString("hex").toUpperCase()
@@ -38,13 +44,13 @@ function generateLicenseKey() {
 }
 
 // Función para generar licencias únicas
-async function generateUniqueLicenses(count: number, sheet: any) {
+async function generateUniqueLicenses(count, sheet) {
   const licenses = []
   const existingLicenses = new Set()
 
   // Obtener todas las licencias existentes
   const rows = await sheet.getRows()
-  rows.forEach((row: any) => {
+  rows.forEach((row) => {
     const license = row.get("licencia")
     if (license) {
       existingLicenses.add(license)
@@ -66,14 +72,14 @@ async function generateUniqueLicenses(count: number, sheet: any) {
 }
 
 // Función para enviar email con múltiples licencias
-async function sendMultipleLicensesEmail(licenseData: any) {
+async function sendMultipleLicensesEmail(licenseData) {
   try {
     const { licenses, customerEmail, customerName, orderNumber, orderTotal, currency } = licenseData
 
     // Generar HTML para múltiples licencias
     const licensesHtml = licenses
       .map(
-        (license: string, index: number) => `
+        (license, index) => `
       <div class="license-box">
         <h3>Licencia ${index + 1}:</h3>
         <div class="license-code">${license}</div>
@@ -283,31 +289,73 @@ async function sendMultipleLicensesEmail(licenseData: any) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    // Obtener el cuerpo del request como texto para verificar la firma
-    const body = await request.text()
-    const signature = request.headers.get("X-Shopify-Hmac-Sha256")
+// ✅ EXPORT DEFAULT PARA PAGES ROUTER (tu archivo actual)
+export default async function handler(req, res) {
+  // 📝 LOGS MEJORADOS
+  console.log("🚀 [WEBHOOK] Webhook recibido de Shopify")
+  console.log("🕐 [WEBHOOK] Timestamp:", new Date().toISOString())
 
-    // Verificar la autenticidad del webhook
-    if (signature && !verifyShopifyWebhook(body, signature)) {
-      console.error("Webhook signature verification failed")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  // Añadir headers CORS a todas las respuestas
+  addCorsHeaders(res)
+
+  // Manejar preflight request (OPTIONS)
+  if (req.method === "OPTIONS") {
+    return res.status(200).end()
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" })
+  }
+
+  try {
+    // Para verificar la firma necesitamos el body raw
+    let body
+    if (typeof req.body === "string") {
+      body = req.body
+    } else {
+      body = JSON.stringify(req.body)
     }
 
-    // Parsear el JSON después de la verificación
-    const orderData = JSON.parse(body)
-    const { id: order_id, order_number, customer, line_items, billing_address, shipping_address } = orderData
+    const signature = req.headers["x-shopify-hmac-sha256"]
 
-    console.log(`Procesando pedido: ${order_number} para ${customer?.email}`)
+    // 📝 LOG DE VERIFICACIÓN
+    console.log("🔐 [WEBHOOK] Verificando firma HMAC...")
+    console.log("🔐 [WEBHOOK] Signature presente:", !!signature)
+
+    // Verificar webhook
+    if (signature && !verifyShopifyWebhook(body, signature)) {
+      console.error("❌ [WEBHOOK] Verificación HMAC falló")
+      return res.status(401).json({ error: "Unauthorized" })
+    }
+
+    console.log("✅ [WEBHOOK] Verificación HMAC exitosa")
+
+    // Parsear datos del pedido
+    const orderData = typeof req.body === "string" ? JSON.parse(req.body) : req.body
+    const { id: order_id, order_number, customer, line_items } = orderData
+
+    // 📝 LOG DE PEDIDO
+    console.log("📦 [PEDIDO] Procesando pedido:", {
+      order_id,
+      order_number,
+      customer_email: customer?.email,
+      total_items: line_items?.length || 0,
+    })
 
     // Buscar SOLO productos con SKU "SilkifyTheme" o título "Silkify Theme"
     let totalLicenses = 0
     const themeItems = []
 
-    line_items?.forEach((item: any) => {
+    line_items?.forEach((item, index) => {
       // DETECCIÓN ESPECÍFICA: Solo SKU "SilkifyTheme" o título "Silkify Theme"
       const isSilkifyTheme = item.sku === "SilkifyTheme" || item.title?.includes("Silkify Theme")
+
+      // 📝 LOG POR PRODUCTO
+      console.log(`🛍️ [PRODUCTO ${index + 1}] ${item.title}`, {
+        sku: item.sku,
+        quantity: item.quantity,
+        is_silkify: isSilkifyTheme,
+      })
 
       if (isSilkifyTheme) {
         // Determinar cuántas licencias incluye este item
@@ -318,6 +366,7 @@ export async function POST(request: NextRequest) {
         if (titleMatch) {
           const licensesInTitle = Number.parseInt(titleMatch[1])
           licensesForThisItem = licensesInTitle * item.quantity
+          console.log(`🔢 [LICENCIAS] Detectadas ${licensesInTitle} licencias en título`)
         }
 
         totalLicenses += licensesForThisItem
@@ -326,18 +375,19 @@ export async function POST(request: NextRequest) {
           licensesCount: licensesForThisItem,
         })
 
-        console.log(`Producto Silkify detectado: ${item.title} - ${licensesForThisItem} licencias`)
+        console.log(`✅ [SILKIFY] Producto detectado: ${item.title} - ${licensesForThisItem} licencias`)
       }
     })
 
     if (totalLicenses === 0) {
-      console.log("Pedido no incluye productos Silkify Theme, ignorando")
-      return NextResponse.json({ success: true, message: "No es compra de Silkify Theme" })
+      console.log("🚫 [RESULTADO] No hay productos Silkify, terminando")
+      return res.json({ success: true, message: "No es compra de Silkify Theme" })
     }
 
-    console.log(`Generando ${totalLicenses} licencias para el pedido ${order_number}`)
+    console.log(`🎯 [LICENCIAS] Generando ${totalLicenses} licencias para el pedido ${order_number}`)
 
     // Configurar autenticación con Google Sheets
+    console.log("📊 [SHEETS] Conectando a Google Sheets...")
     const serviceAccountAuth = new JWT({
       email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: GOOGLE_PRIVATE_KEY,
@@ -373,10 +423,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    console.log(`${totalLicenses} licencias guardadas en Google Sheets:`, generatedLicenses)
+    console.log(`✅ [SHEETS] ${totalLicenses} licencias guardadas exitosamente:`, generatedLicenses)
 
     // Enviar UN SOLO email con todas las licencias
     if (customer?.email && RESEND_API_KEY) {
+      console.log(`📧 [EMAIL] Enviando email a ${customer.email}...`)
+
       const emailResult = await sendMultipleLicensesEmail({
         licenses: generatedLicenses,
         customerEmail: customer.email,
@@ -387,13 +439,22 @@ export async function POST(request: NextRequest) {
       })
 
       if (emailResult.success) {
-        console.log(`Email con ${totalLicenses} licencias enviado a ${customer.email}`)
+        console.log("✅ [EMAIL] Email enviado exitosamente")
       } else {
-        console.error(`Error enviando email a ${customer.email}:`, emailResult.error)
+        console.error("❌ [EMAIL] Error enviando email:", emailResult.error)
       }
+    } else {
+      console.log("⚠️ [EMAIL] Email no enviado - falta email del cliente o API key")
     }
 
-    return NextResponse.json({
+    // 📝 LOG FINAL
+    console.log("🎉 [WEBHOOK] Proceso completado exitosamente", {
+      order_number,
+      total_licenses: totalLicenses,
+      email_sent: !!customer?.email && !!RESEND_API_KEY,
+    })
+
+    return res.json({
       success: true,
       licenses: generatedLicenses,
       total_licenses: totalLicenses,
@@ -401,14 +462,17 @@ export async function POST(request: NextRequest) {
       email_sent: !!customer?.email && !!RESEND_API_KEY,
     })
   } catch (error) {
-    console.error("Error generating licenses:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Error generando licencias",
-        details: error.message,
-      },
-      { status: 500 },
-    )
+    // 📝 LOG DE ERROR
+    console.error("💥 [ERROR] Error procesando webhook:", {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+    })
+
+    return res.status(500).json({
+      success: false,
+      error: "Error generando licencias",
+      details: error.message,
+    })
   }
 }
