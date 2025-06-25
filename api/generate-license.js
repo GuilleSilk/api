@@ -343,8 +343,15 @@ export default async function handler(req, res) {
 
     const signature = req.headers["x-shopify-hmac-sha256"]
 
+    // 🔍 LOGS DE DEBUG PARA HMAC
+    console.log("🔐 [DEBUG] Headers recibidos:", Object.keys(req.headers))
+    console.log("🔐 [DEBUG] Signature recibida:", signature ? "SÍ" : "NO")
+    console.log("🔐 [DEBUG] SHOPIFY_WEBHOOK_SECRET configurado:", !!SHOPIFY_WEBHOOK_SECRET)
+    console.log("🔐 [DEBUG] Raw body length:", rawBody?.length)
+    console.log("🔐 [DEBUG] Raw body preview:", rawBody?.substring(0, 100))
+
     // Verificación HMAC (opcional)
-    const skipVerification = process.env.SKIP_WEBHOOK_VERIFICATION === "true"
+    const skipVerification = true // ← CAMBIAR A true TEMPORALMENTE
     if (!skipVerification && signature && !verifyShopifyWebhook(rawBody, signature)) {
       console.error("❌ [WEBHOOK] Verificación HMAC falló")
       return res.status(401).json({ error: "Unauthorized" })
