@@ -1,3 +1,5 @@
+// ✅ VERSIÓN CON DEBUGGING MEJORADO
+
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
 import { Resend } from "resend"
@@ -289,25 +291,47 @@ async function sendMultipleLicensesEmail(licenseData) {
   }
 }
 
-// ✅ EXPORT DEFAULT PARA PAGES ROUTER (tu archivo actual)
+// ✅ HANDLER CON DEBUGGING MEJORADO
 export default async function handler(req, res) {
-  // 📝 LOGS MEJORADOS
+  // 📝 LOGS DE DEBUGGING
   console.log("🚀 [WEBHOOK] Webhook recibido de Shopify")
   console.log("🕐 [WEBHOOK] Timestamp:", new Date().toISOString())
+  console.log("🔍 [DEBUG] Método HTTP:", req.method)
+  console.log("🔍 [DEBUG] Headers:", JSON.stringify(req.headers, null, 2))
+  console.log("🔍 [DEBUG] URL:", req.url)
 
   // Añadir headers CORS a todas las respuestas
   addCorsHeaders(res)
 
   // Manejar preflight request (OPTIONS)
   if (req.method === "OPTIONS") {
+    console.log("✅ [CORS] Respondiendo a preflight request")
     return res.status(200).end()
   }
 
+  // ✅ PERMITIR TANTO GET COMO POST PARA DEBUGGING
+  if (req.method === "GET") {
+    console.log("🔍 [DEBUG] Request GET recibido - respondiendo con info")
+    return res.json({
+      message: "Webhook endpoint funcionando",
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      url: req.url,
+    })
+  }
+
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" })
+    console.error(`❌ [ERROR] Método ${req.method} no permitido`)
+    return res.status(405).json({
+      error: "Method not allowed",
+      received_method: req.method,
+      expected_method: "POST",
+    })
   }
 
   try {
+    console.log("📦 [WEBHOOK] Procesando request POST...")
+
     // Para verificar la firma necesitamos el body raw
     let body
     if (typeof req.body === "string") {
@@ -315,6 +339,9 @@ export default async function handler(req, res) {
     } else {
       body = JSON.stringify(req.body)
     }
+
+    console.log("🔍 [DEBUG] Tipo de body:", typeof req.body)
+    console.log("🔍 [DEBUG] Body length:", body.length)
 
     const signature = req.headers["x-shopify-hmac-sha256"]
 
