@@ -1,4 +1,4 @@
-// ✅ VERSIÓN CON DEDUPLICACIÓN - SOLO UNA EJECUCIÓN POR PEDIDO
+// ✅ VERSIÓN SIMPLE - SOLO VERIFICAR SI EL PEDIDO YA EXISTE
 
 import { GoogleSpreadsheet } from "google-spreadsheet"
 import { JWT } from "google-auth-library"
@@ -14,59 +14,6 @@ const FROM_EMAIL = process.env.FROM_EMAIL || "licencias@tudominio.com"
 const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET
 
 const resend = new Resend(RESEND_API_KEY)
-
-// 🔒 CACHE EN MEMORIA PARA DEDUPLICACIÓN (simple pero efectivo)
-const processedOrders = new Set()
-const processedWebhooks = new Set()
-
-// 🔧 FUNCIÓN PARA VERIFICAR SI YA PROCESAMOS ESTE PEDIDO
-async function isOrderAlreadyProcessed(orderNumber, sheet) {
-  try {
-    // 1. Verificar en cache en memoria
-    if (processedOrders.has(orderNumber)) {
-      console.log(`🔒 [DEDUP] Pedido ${orderNumber} ya procesado en memoria`)
-      return true
-    }
-
-    // 2. Verificar en Google Sheets
-    const rows = await sheet.getRows()
-    const existingOrder = rows.find((row) => row.get("order_number") === orderNumber.toString())
-
-    if (existingOrder) {
-      console.log(`🔒 [DEDUP] Pedido ${orderNumber} ya existe en Google Sheets`)
-      // Añadir al cache para futuras verificaciones
-      processedOrders.add(orderNumber)
-      return true
-    }
-
-    return false
-  } catch (error) {
-    console.error("❌ [DEDUP] Error verificando duplicados:", error.message)
-    // En caso de error, permitir el procesamiento para no perder pedidos
-    return false
-  }
-}
-
-// 🔧 FUNCIÓN PARA VERIFICAR WEBHOOK DUPLICADO
-function isWebhookDuplicated(webhookId, eventId) {
-  const webhookKey = `${webhookId}-${eventId}`
-
-  if (processedWebhooks.has(webhookKey)) {
-    console.log(`🔒 [DEDUP] Webhook ${webhookKey} ya procesado`)
-    return true
-  }
-
-  // Añadir al cache
-  processedWebhooks.add(webhookKey)
-
-  // Limpiar cache cada 1000 entradas para evitar memory leaks
-  if (processedWebhooks.size > 1000) {
-    console.log("🧹 [CACHE] Limpiando cache de webhooks...")
-    processedWebhooks.clear()
-  }
-
-  return false
-}
 
 // Función para verificar la autenticidad del webhook de Shopify
 function verifyShopifyWebhook(body, signature) {
@@ -350,26 +297,10 @@ async function sendMultipleLicensesEmail(licenseData) {
   }
 }
 
-// ✅ HANDLER PRINCIPAL CON DEDUPLICACIÓN
+// ✅ HANDLER PRINCIPAL - SIMPLE Y DIRECTO
 export default async function handler(req, res) {
-  const webhookId = req.headers["x-shopify-webhook-id"]
-  const eventId = req.headers["x-shopify-event-id"]
-
   console.log("🚀 [WEBHOOK] Webhook recibido de Shopify")
   console.log("🕐 [WEBHOOK] Timestamp:", new Date().toISOString())
-  console.log("🔍 [WEBHOOK] ID:", webhookId)
-  console.log("🔍 [WEBHOOK] Event ID:", eventId)
-
-  // 🔒 VERIFICAR WEBHOOK DUPLICADO
-  if (isWebhookDuplicated(webhookId, eventId)) {
-    console.log("🔒 [DEDUP] Webhook duplicado detectado - ignorando")
-    return res.json({
-      success: true,
-      message: "Webhook duplicado - ya procesado",
-      webhook_id: webhookId,
-      event_id: eventId,
-    })
-  }
 
   // Añadir headers CORS a todas las respuestas
   addCorsHeaders(res)
@@ -386,8 +317,6 @@ export default async function handler(req, res) {
     return res.json({
       message: "Webhook endpoint funcionando",
       timestamp: new Date().toISOString(),
-      processed_orders_count: processedOrders.size,
-      processed_webhooks_count: processedWebhooks.size,
     })
   }
 
@@ -431,12 +360,10 @@ export default async function handler(req, res) {
       order_number,
       customer_email: customer?.email,
       total_items: line_items?.length || 0,
-      financial_status,
     })
 
-    // 🔒 VERIFICAR SI YA PROCESAMOS ESTE PEDIDO
-    // Primero conectamos a Google Sheets para verificar
-    console.log("📊 [SHEETS] Conectando a Google Sheets para verificar duplicados...")
+    // 🔒 VERIFICAR SI YA PROCESAMOS ESTE PEDIDO (SIMPLE)
+    console.log("📊 [SHEETS] Conectando a Google Sheets...")
     const serviceAccountAuth = new JWT({
       email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: GOOGLE_PRIVATE_KEY,
@@ -451,10 +378,13 @@ export default async function handler(req, res) {
       throw new Error("Hoja de licencias no encontrada")
     }
 
-    // Verificar si ya procesamos este pedido
-    const alreadyProcessed = await isOrderAlreadyProcessed(order_number || order_id, sheet)
-    if (alreadyProcessed) {
-      console.log(`🔒 [DEDUP] Pedido ${order_number} ya fue procesado - ignorando`)
+    // 🔍 VERIFICAR SI EL PEDIDO YA EXISTE
+    console.log(`🔍 [DEDUP] Verificando si el pedido ${order_number} ya existe...`)
+    const rows = await sheet.getRows()
+    const existingOrder = rows.find((row) => row.get("order_number") === (order_number || order_id).toString())
+
+    if (existingOrder) {
+      console.log(`🔒 [DEDUP] Pedido ${order_number} ya fue procesado - IGNORANDO`)
       return res.json({
         success: true,
         message: "Pedido ya procesado anteriormente",
@@ -462,6 +392,8 @@ export default async function handler(req, res) {
         duplicate: true,
       })
     }
+
+    console.log(`✅ [DEDUP] Pedido ${order_number} es nuevo - PROCESANDO`)
 
     // Buscar SOLO productos con SKU "SilkifyTheme" o título "Silkify Theme"
     let totalLicenses = 0
@@ -503,9 +435,6 @@ export default async function handler(req, res) {
 
     console.log(`🎯 [LICENCIAS] Generando ${totalLicenses} licencias para el pedido ${order_number}`)
 
-    // 🔒 MARCAR PEDIDO COMO PROCESADO EN MEMORIA
-    processedOrders.add(order_number || order_id)
-
     // Generar licencias únicas
     const generatedLicenses = await generateUniqueLicenses(totalLicenses, sheet)
     const today = new Date().toISOString().split("T")[0]
@@ -525,8 +454,6 @@ export default async function handler(req, res) {
         order_total: orderData.total_price || "",
         currency: orderData.currency || "EUR",
         financial_status: financial_status || "",
-        webhook_id: webhookId || "",
-        event_id: eventId || "",
       })
     }
 
@@ -559,8 +486,6 @@ export default async function handler(req, res) {
       order_number,
       total_licenses: totalLicenses,
       email_sent: !!customer?.email && !!RESEND_API_KEY,
-      webhook_id: webhookId,
-      event_id: eventId,
     })
 
     return res.json({
@@ -569,8 +494,6 @@ export default async function handler(req, res) {
       total_licenses: totalLicenses,
       order_number: order_number || order_id,
       email_sent: !!customer?.email && !!RESEND_API_KEY,
-      webhook_id: webhookId,
-      event_id: eventId,
       duplicate: false,
     })
   } catch (error) {
@@ -579,16 +502,12 @@ export default async function handler(req, res) {
       error: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString(),
-      webhook_id: webhookId,
-      event_id: eventId,
     })
 
     return res.status(500).json({
       success: false,
       error: "Error generando licencias",
       details: error.message,
-      webhook_id: webhookId,
-      event_id: eventId,
     })
   }
 }
