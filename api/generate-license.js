@@ -303,7 +303,7 @@ async function sendMultipleLicensesEmail(licenseData) {
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [customerEmail],
-      subject: `Tus ${licenses.length} licencias de Silkify - Pedido #${orderNumber}`,
+      subject: `Tus ${licenses.length} licencias de Silkify - Pedido Sy${orderNumber}`,
       html: emailHtml,
     })
 
